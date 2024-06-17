@@ -1,0 +1,8 @@
+mvtec_ad_evaluation
+mvtec_anomaly_detection
+models
+output
+build
+.vscode
+__pycache__
+q_anom.onnx

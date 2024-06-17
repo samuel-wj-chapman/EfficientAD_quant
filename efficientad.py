@@ -9,10 +9,12 @@ import argparse
 import itertools
 import os
 import random
+import shutil
 from tqdm import tqdm
 from common import get_autoencoder, get_pdn_small, get_pdn_medium, \
     ImageFolderWithoutTarget, ImageFolderWithPath, InfiniteDataloader
 from sklearn.metrics import roc_auc_score
+
 
 def get_argparse():
     parser = argparse.ArgumentParser()
@@ -83,7 +85,13 @@ def main():
                                     config.dataset, config.subdataset)
     test_output_dir = os.path.join(config.output_dir, 'anomaly_maps',
                                    config.dataset, config.subdataset, 'test')
+    
+
+    if os.path.exists(train_output_dir):
+        shutil.rmtree(train_output_dir)
     os.makedirs(train_output_dir)
+    if os.path.exists(test_output_dir):
+        shutil.rmtree(test_output_dir)
     os.makedirs(test_output_dir)
 
     # load data
@@ -162,7 +170,7 @@ def main():
                                                  autoencoder.parameters()),
                                  lr=1e-4, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=int(0.95 * config.train_steps), gamma=0.1)
+        optimizer, step_size=int(0.95 * config.train_steps), gamma=0.1)   
     tqdm_obj = tqdm(range(config.train_steps))
     for iteration, (image_st, image_ae), image_penalty in zip(
             tqdm_obj, train_loader_infinite, penalty_loader_infinite):
@@ -279,8 +287,16 @@ def test(test_set, teacher, student, autoencoder, teacher_mean, teacher_std,
         map_combined = torch.nn.functional.pad(map_combined, (4, 4, 4, 4))
         map_combined = torch.nn.functional.interpolate(
             map_combined, (orig_height, orig_width), mode='bilinear')
-        map_combined = map_combined[0, 0].cpu().numpy()
+        #torch.cuda.synchronize()
+        #print(map_combined.shape)
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
 
+        #start_event.record()
+        map_combined = map_combined[0, 0].cpu().numpy() #.cpu()
+        #end_event.record()
+        #torch.cuda.synchronize()  # Wait for the events to be recorded!
+        #print(f"Time to transfer and convert: {start_event.elapsed_time(end_event)} milliseconds")
         defect_class = os.path.basename(os.path.dirname(path))
         if test_output_dir is not None:
             img_nm = os.path.split(path)[1].split('.')[0]

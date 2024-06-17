@@ -3,6 +3,7 @@
 from torch import nn
 from torchvision.datasets import ImageFolder
 import torch
+
 def get_autoencoder(out_channels=384):
     return nn.Sequential(
         # encoder
@@ -118,6 +119,7 @@ def InfiniteDataloader(loader):
             yield next(iterator)
         except StopIteration:
             iterator = iter(loader)
+
 
 
 class UnifiedAnomalyDetectionModel(nn.Module):
