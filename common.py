@@ -3,6 +3,8 @@
 from torch import nn
 from torchvision.datasets import ImageFolder
 import torch
+
+
 def get_autoencoder(out_channels=384):
     return nn.Sequential(
         # encoder
@@ -121,27 +123,37 @@ def InfiniteDataloader(loader):
 
 
 class UnifiedAnomalyDetectionModel(nn.Module):
-    def __init__(self, teacher, student, autoencoder, out_channels):
+    def __init__(self, teacher, student, autoencoder, out_channels, teacher_mean, teacher_std, q_st_start=None, q_st_end=None, q_ae_start=None, q_ae_end=None):
         super(UnifiedAnomalyDetectionModel, self).__init__()
         self.teacher = teacher
         self.student = student
         self.autoencoder = autoencoder
         self.out_channels = out_channels
+        self.teacher_mean = teacher_mean
+        self.teacher_std = teacher_std
+        self.q_st_start = q_st_start
+        self.q_st_end = q_st_end
+        self.q_ae_start = q_ae_start
+        self.q_ae_end = q_ae_end
+
 
     def forward(self, input_image):
         # Forward pass through each model
         teacher_output = self.teacher(input_image)
         student_output = self.student(input_image)
         autoencoder_output = self.autoencoder(input_image)
-
+        teacher_output = (teacher_output - self.teacher_mean) / self.teacher_std
         # Split student output for comparison with teacher and autoencoder outputs
         student_output_st = student_output[:, :self.out_channels]
         student_output_ae = student_output[:, self.out_channels:]
 
         # Calculate MSE between teacher-student and autoencoder-student
-        mse_st = torch.mean((teacher_output - student_output_st) ** 2, dim=1, keepdim=True)
-        mse_ae = torch.mean((autoencoder_output - student_output_ae) ** 2, dim=1, keepdim=True)
-
+        mse_st = torch.mean((teacher_output - student_output_st) * (teacher_output - student_output_st), dim=1, keepdim=True)
+        mse_ae = torch.mean((autoencoder_output - student_output_ae) * (autoencoder_output - student_output_ae), dim=1, keepdim=True)
+        if self.q_st_start is not None:
+            map_st = 0.1 * (map_st - self.q_st_start) / (self.q_st_end - self.q_st_start)
+        if self.q_ae_start is not None:
+            map_ae = 0.1 * (map_ae - self.q_ae_start) / (self.q_ae_end - self.q_ae_start)
         # Combine the MSE maps
         map_combined = 0.5 * mse_st + 0.5 * mse_ae
 

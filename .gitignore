@@ -6,3 +6,5 @@ build
 .vscode
 __pycache__
 q_anom.onnx
+combined_model.pth
+combined_model.zip
