@@ -48,7 +48,7 @@ def get_argparse():
 # constants
 seed = 42
 on_gpu = torch.cuda.is_available()
-out_channels = 384
+out_channels = 192#384
 image_size = 256
 
 # data loading
@@ -72,10 +72,11 @@ def main():
     #random.seed(seed)
 
     config = get_argparse()
+    on_gpu = torch.cuda.is_available()  # Ensure this is defined after argparse to use throughout
 
 
     seed = 42
-    out_channels = 384
+    out_channels = 192#384
     image_size = 256
     from common import get_pdn_small, get_autoencoder, UnifiedAnomalyDetectionModel
 
@@ -142,9 +143,13 @@ def main():
 
 
     # Assuming the paths to the trained model weights are defined
-    teacher_weights = 'output/1/trainings/mvtec_ad/bottle/teacher_final.pth'
-    student_weights = 'output/1/trainings/mvtec_ad/bottle/student_final.pth'
-    autoencoder_weights = 'output/1/trainings/mvtec_ad/bottle/autoencoder_final.pth'
+    #teacher_weights = 'output/1/trainings/mvtec_ad/bottle/teacher_final.pth'
+    #student_weights = 'output/1/trainings/mvtec_ad/bottle/student_final.pth'
+    #autoencoder_weights = 'output/1/trainings/mvtec_ad/bottle/autoencoder_final.pth'
+
+    teacher_weights = f'output/1/trainings/mvtec_ad/{config.subdataset}/teacher_final.pth'
+    student_weights = f'output/1/trainings/mvtec_ad/{config.subdataset}/student_final.pth'
+    autoencoder_weights = f'output/1/trainings/mvtec_ad/{config.subdataset}/autoencoder_final.pth'
 
     # Create model instances
     #teacher_model = get_pdn_small(out_channels)  # or get_pdn_medium based on your configuration
@@ -153,24 +158,68 @@ def main():
 
 
     # Load trained weights with map_location
-    teacher = torch.load(teacher_weights, map_location=torch.device('cpu'))
-    student = torch.load(student_weights, map_location=torch.device('cpu'))
-    autoencoder = torch.load(autoencoder_weights, map_location=torch.device('cpu'))
+    map_location = torch.device('cuda') if on_gpu else torch.device('cpu')
+    teacher = torch.load(teacher_weights, map_location=map_location)
+    student = torch.load(student_weights, map_location=map_location)
+    autoencoder = torch.load(autoencoder_weights, map_location=map_location)
+    if on_gpu:
+        teacher = teacher.cuda()
+        student = student.cuda()
+        autoencoder = autoencoder.cuda()
+
+
+
+    teacher = get_pdn_small(out_channels)  # Adjust out_channels as needed
+    student = get_pdn_small(2 * out_channels)  # Adjust according to your needs, typically double for the student
+    autoencoder = get_autoencoder(out_channels)
+
+    # If running on GPU, move the models to GPU
+    if on_gpu:
+        teacher = teacher.cuda()
+        student = student.cuda()
+        autoencoder = autoencoder.cuda()
+
+
+
+    
+    #teacher = torch.load(teacher_weights, map_location=torch.device('cpu'))
+    #student = torch.load(student_weights, map_location=torch.device('cpu'))
+    #autoencoder = torch.load(autoencoder_weights, map_location=torch.device('cpu'))
+
+    #teacher.eval()
+    #student.eval()
+    #autoencoder.eval()
 
     # Load trained weights
     #teacher_model.load_state_dict(torch.load(teacher_weights))
     #student_model.load_state_dict(torch.load(student_weights))
     #autoencoder_model.load_state_dict(torch.load(autoencoder_weights))
+
+    
     teacher_mean, teacher_std = teacher_normalization(teacher, train_loader)
-    # Create the unified model
 
 
     q_st_start, q_st_end, q_ae_start, q_ae_end = map_normalization(
         validation_loader=train_loader, teacher=teacher, student=student,
         autoencoder=autoencoder, teacher_mean=teacher_mean,
         teacher_std=teacher_std, desc='Final map normalization')
+        
     
-    unified_model = UnifiedAnomalyDetectionModel(teacher, student, autoencoder, out_channels, teacher_mean, teacher_std, q_st_start=None, q_st_end=None, q_ae_start=None, q_ae_end=None)
+    unified_model = UnifiedAnomalyDetectionModel(teacher, student, autoencoder, out_channels, teacher_mean, teacher_std, q_st_start, q_st_end, q_ae_start, q_ae_end)
+    #unified_model = UnifiedAnomalyDetectionModel(teacher, student, autoencoder)
+    # Push a random output through the model to ensure it works
+    test_input = torch.randn(1, 3, 256, 256)  # Assuming input size of 256x256 RGB image
+    if on_gpu:
+        test_input = test_input.cuda()
+    try:
+        test_output = unified_model(test_input)
+        print("Model output shape:", test_output.shape)
+        print("Model test run successful.")
+    except Exception as e:
+        print("Error during model test run:", str(e))
+    
+    if on_gpu:
+        unified_model.cuda()
 
 
 
@@ -298,7 +347,8 @@ def main():
             student.train()
             autoencoder.train()
 
-    teacher.eval()
+    teacher.eval()    on_gpu = torch.cuda.is_available()  # Ensure this is defined after argparse to use throughout
+
     student.eval()
     autoencoder.eval()
 
@@ -308,34 +358,41 @@ def main():
                                          'autoencoder_final.pth'))
     '''
 
-    unified_model.eval()
-    import json
-    torch.save(unified_model.state_dict(), 'combined_model.pth')
-    params = {
-        'out_channels': unified_model.out_channels,
-        'teacher_mean': unified_model.teacher_mean.tolist(),  # Convert tensors to lists
-        'teacher_std': unified_model.teacher_std.tolist(),
-        'q_st_start': unified_model.q_st_start.item() if unified_model.q_st_start is not None else None,
-        'q_st_end': unified_model.q_st_end.item() if unified_model.q_st_end is not None else None,
-        'q_ae_start': unified_model.q_ae_start.item() if unified_model.q_ae_start is not None else None,
-        'q_ae_end': unified_model.q_ae_end.item() if unified_model.q_ae_end is not None else None
-    }
+    #unified_model.eval()
+    #import json
+    #torch.save(unified_model.state_dict(), 'combined_model.pth')
+    #params = {
+    #    'out_channels': unified_model.out_channels,
+    #    'teacher_mean': unified_model.teacher_mean.tolist(),  # Convert tensors to lists
+    #    'teacher_std': unified_model.teacher_std.tolist(),
+    #    'q_st_start': unified_model.q_st_start.item() if unified_model.q_st_start is not None else None,
+    #    'q_st_end': unified_model.q_st_end.item() if unified_model.q_st_end is not None else None,
+    #    'q_ae_start': unified_model.q_ae_start.item() if unified_model.q_ae_start is not None else None,
+     #   'q_ae_end': unified_model.q_ae_end.item() if unified_model.q_ae_end is not None else None
+    #}
 
 
     
-    params_save_path = 'unified_model_params.json'
-    with open(params_save_path, 'w') as f:
-        json.dump(params, f)
+    #params_save_path = 'unified_model_params.json'
+    #with open(params_save_path, 'w') as f:
+     #   json.dump(params, f)
     
-    if q_st_end is not None: 
-        print('warning code wont work', q_st_start)
-
-    auc = test(
-        test_set=test_set, unified_model=unified_model,  q_st_start=q_st_start, q_st_end=q_st_end,
-        q_ae_start=q_ae_start, q_ae_end=q_ae_end,
-        test_output_dir=test_output_dir, desc='Final inference')
-    print('Final image auc: {:.4f}'.format(auc))
-
+    #if q_st_end is not None: 
+    #    print('norm values', q_st_start)
+    #########################
+    #auc = test_trial(test_set=test_set, unified=unified_model, teacher_mean=teacher_mean, teacher_std=teacher_std, q_st_start=q_st_start, q_st_end=q_st_end,
+    #    q_ae_start=q_ae_start, q_ae_end=q_ae_end,
+    #    test_output_dir=test_output_dir_quant, desc='Final inference')
+    #print('Final image auc: {:.4f}'.format(auc))
+    ######################
+    
+    #auc = testold(
+    #    test_set=test_set, teacher=teacher, student=student,
+    #    autoencoder=autoencoder, teacher_mean=teacher_mean,
+    #    teacher_std=teacher_std, q_st_start=q_st_start, q_st_end=q_st_end,
+    #    q_ae_start=q_ae_start, q_ae_end=q_ae_end,
+    #    test_output_dir=test_output_dir, desc='Final inference')
+    #print('Final image auc: oldmethod {:.4f}'.format(auc))
     
     # Change the function name and parameters to reflect its new functionality
     def train_dataset_generator(train_loader: DataLoader) -> Iterator[List]:
@@ -362,9 +419,9 @@ def main():
     tpc = mct.get_target_platform_capabilities(fw_name="pytorch", target_platform_name='imx500', target_platform_version='v1')
 
     # Configuration for mixed precision quantization
-    mp_config = mct.core.MixedPrecisionQuantizationConfig(num_of_images=5, use_hessian_based_scores=False)
-    config = mct.core.CoreConfig(mixed_precision_config=mp_config,
-                           quantization_config=mct.core.QuantizationConfig(shift_negative_activation_correction=True))
+    #mp_config = mct.core.MixedPrecisionQuantizationConfig(num_of_images=5, use_hessian_based_scores=False)
+    #config = mct.core.CoreConfig(mixed_precision_config=mp_config,
+    #                       quantization_config=mct.core.QuantizationConfig(shift_negative_activation_correction=True))
 
     # Define target Resource Utilization for mixed precision weights quantization (75% of 'standard' 8bits quantization)
     #resource_utilization_data = mct.core.pytorch_resource_utilization_data(in_model=unified_model,
@@ -372,19 +429,132 @@ def main():
     #                                                                       core_config=config,
     #                                                                       target_platform_capabilities=tpc)
     #resource_utilization = mct.core.ResourceUtilization(weights_memory=resource_utilization_data.weights_memory * 0.75)
+    resource_utilization_data = mct.core.pytorch_resource_utilization_data(in_model=unified_model, representative_data_gen=representative_dataset_gen, 
+                                                                           target_platform_capabilities=tpc)
+    print('float' , resource_utilization_data.weights_memory)
+    print('float - activation mem' , resource_utilization_data.activation_memory)
+    print('float - total mem' , resource_utilization_data.total_memory)
 
-    # Perform post training quantization
-    quant_model, _ = mct.ptq.pytorch_post_training_quantization(in_module=unified_model,
+
+    quant_model_ptq, _ = mct.ptq.pytorch_post_training_quantization(in_module=unified_model,
                                                                 representative_data_gen=representative_dataset_gen,#target_resource_utilization=resource_utilization,
-                                                                core_config=config,
                                                                 target_platform_capabilities=tpc)
+    #teach_quant_model_ptq, _ = mct.ptq.pytorch_post_training_quantization(in_module=teacher,
+    #                                                            representative_data_gen=representative_dataset_gen,#target_resource_utilization=resource_utilization,
+    #                                                            target_platform_capabilities=tpc)
+   # 
+   # student_quant_model_ptq, _ = mct.ptq.pytorch_post_training_quantization(in_module=student,
+   #                                                             representative_data_gen=representative_dataset_gen,#target_resource_utilization=resource_utilization,
+   #                                                             target_platform_capabilities=tpc)
+   # 
+   # auto_quant_model_ptq, _ = mct.ptq.pytorch_post_training_quantization(in_module=autoencoder,
+   #                                                             representative_data_gen=representative_dataset_gen,#target_resource_utilization=resource_utilization,
+   #                                                             target_platform_capabilities=tpc)
+    
 
 
-    auc = test(test_set=test_set, unified_model=quant_model,  q_st_start=q_st_start, q_st_end=q_st_end,
+    #resource_utilization_data = mct.core.pytorch_resource_utilization_data(in_model=quant_model_ptq, representative_data_gen=representative_dataset_gen, 
+    #                                                                       target_platform_capabilities=tpc)
+    #print('q' , _.weights_memory)
+    #print('q - activation mem' , _.activation_memory)
+    #print('q - total mem' , _.total_memory)
+
+
+
+    ########################################
+    #auc_quant_ptq = test_trial(test_set=test_set, unified=quant_model_ptq, teacher_mean=teacher_mean, teacher_std=teacher_std, q_st_start=q_st_start, q_st_end=q_st_end,
+    #    q_ae_start=q_ae_start, q_ae_end=q_ae_end,
+    #    test_output_dir=test_output_dir_quant, desc='Final inference')
+    #print('Final image quant ptq: {:.4f}'.format(auc_quant_ptq))
+    #####################################
+
+    # Export the original unified model to ONNX using the representative dataset generator
+    #sample_data = next(iter(representative_dataset_gen()))
+    #torch.onnx.export(unified_model, sample_data.to(next(unified_model.parameters()).device), 'unified_model.onnx', export_params=True, opset_version=11)
+
+    # Export the quantized PTQ model to ONNX using the representative dataset generator
+    #torch.onnx.export(quant_model_ptq, sample_data.to(next(quant_model_ptq.parameters()).device), 'quant_model_ptq.onnx', export_params=True, opset_version=11)
+
+    mct.exporter.pytorch_export_model(model=quant_model_ptq,
+                                      save_model_path='./quanttest_maxtest.onnx',
+                                      repr_dataset=representative_dataset_gen)
+    '''mct.exporter.pytorch_export_model(model=teach_quant_model_ptq,
+                                      save_model_path='./quant_teacher.onnx',
+                                      repr_dataset=representative_dataset_gen)
+    mct.exporter.pytorch_export_model(model=student_quant_model_ptq,
+                                      save_model_path='./quant_student.onnx',
+                                      repr_dataset=representative_dataset_gen)
+    mct.exporter.pytorch_export_model(model=auto_quant_model_ptq,
+                                      save_model_path='./quant_auto.onnx',
+                                      repr_dataset=representative_dataset_gen)
+    #mct.exporter.pytorch_export_model(model=unified_model,
+    #                                  save_model_path='./mctexport_unified.onnx',
+    #                                  repr_dataset=representative_dataset_gen)
+    '''
+
+    #torch.save(unified_model.state_dict(), 'unified_model_before_quant.pth')
+    torch.save(quant_model_ptq.state_dict(), 'quant_model_ptq_after_quant.pth')
+    # Save the model configurations and parameters
+    import json
+    config_params = {
+        'q_st_start': q_st_start.item() if q_st_start is not None else None,  # Convert tensor to float
+        'q_st_end': q_st_end.item() if q_st_end is not None else None,        # Convert tensor to float
+        'q_ae_start': q_ae_start.item() if q_ae_start is not None else None, # Convert tensor to float
+        'q_ae_end': q_ae_end.item() if q_ae_end is not None else None         # Convert tensor to float
+    }
+    with open('model_config_params.json', 'w') as f:
+        json.dump(config_params, f)
+
+    # Function to load model configurations and parameters
+    import json
+
+
+    def load_model_config(filename='model_config_params.json'):
+        with open(filename, 'r') as f:
+            config = json.load(f)
+        # Convert the values back to tensors if necessary
+        config['q_st_start'] = torch.tensor(config['q_st_start']) if config['q_st_start'] is not None else None
+        config['q_st_end'] = torch.tensor(config['q_st_end']) if config['q_st_end'] is not None else None
+        config['q_ae_start'] = torch.tensor(config['q_ae_start']) if config['q_ae_start'] is not None else None
+        config['q_ae_end'] = torch.tensor(config['q_ae_end']) if config['q_ae_end'] is not None else None
+        return config
+    
+
+
+    gptq_config = mct.gptq.get_pytorch_gptq_config(n_epochs=500)
+    # Perform post training quantization
+    '''
+    quant_model, quantization_info = mct.gptq.pytorch_gradient_post_training_quantization(
+        unified_model,
+        representative_dataset_gen,
+        gptq_config=gptq_config,
+        target_platform_capabilities=tpc
+    )
+
+    #quant_model, _ = mct.ptq.pytorch_post_training_quantization(in_module=unified_model,
+    #                                                            representative_data_gen=representative_dataset_gen,#target_resource_utilization=resource_utilization,
+    #                                                            target_platform_capabilities=tpc)
+   # 
+
+    auc_quant = test_trial(test_set=test_set, unified=quant_model, teacher_mean=teacher_mean, teacher_std=teacher_std, q_st_start=q_st_start, q_st_end=q_st_end,
         q_ae_start=q_ae_start, q_ae_end=q_ae_end,
         test_output_dir=test_output_dir_quant, desc='Final inference')
-    print('Final image auc quant: {:.4f}'.format(auc))
+    print('Final image quant gptq: {:.4f}'.format(auc_quant))
     
+    # Save AUC and normalization values to a human-readable file
+    results_filename = f"{config.subdataset}_2results.txt"
+    with open(results_filename, 'w') as file:
+        file.write(f"Final image AUC (non-quantized): {auc:.4f}\n")
+        file.write(f"Final image AUC gptq (quantized): {auc_quant:.4f}\n")
+        file.write(f"Final image AUC ptq (quantized): {auc_quant_ptq:.4f}\n")
+        file.write("Normalization Values:\n")
+        file.write(f"Teacher Mean: {teacher_mean.tolist()}\n")
+        file.write(f"Teacher Std: {teacher_std.tolist()}\n")
+        file.write(f"Q_st_start: {q_st_start}\n")
+        file.write(f"Q_st_end: {q_st_end}\n")
+        file.write(f"Q_ae_start: {q_ae_start}\n")
+        file.write(f"Q_ae_end: {q_ae_end}\n")
+    '''
 
 def test(test_set,unified_model, q_st_start, q_st_end, q_ae_start, q_ae_end, test_output_dir=None,
          desc='Running inference'):
@@ -402,8 +572,7 @@ def test(test_set,unified_model, q_st_start, q_st_end, q_ae_start, q_ae_end, tes
         map_combined = torch.nn.functional.interpolate(
             map_combined, (orig_height, orig_width), mode='bilinear')
 
-        #map_combined = map_combined[0, 0].cpu().numpy() #.cpu()
-        map_combined = map_combined[0, 0].detach().cpu().numpy()
+        map_combined = map_combined[0, 0].cpu().numpy()
 
         defect_class = os.path.basename(os.path.dirname(path))
         if test_output_dir is not None:
@@ -419,6 +588,217 @@ def test(test_set,unified_model, q_st_start, q_st_end, q_ae_start, q_ae_end, tes
         y_score.append(y_score_image)
     auc = roc_auc_score(y_true=y_true, y_score=y_score)
     return auc * 100
+
+
+def testold(test_set, teacher, student, autoencoder, teacher_mean, teacher_std,
+         q_st_start, q_st_end, q_ae_start, q_ae_end, test_output_dir=None,
+         desc='Running inference'):
+    y_true = []
+    y_score = []
+    for image, target, path in tqdm(test_set, desc=desc):
+        orig_width = image.width
+        orig_height = image.height
+        image = default_transform(image)
+        image = image[None]
+        if on_gpu:
+            image = image.cuda()
+        map_combined, map_st, map_ae = predict(
+            image=image, teacher=teacher, student=student,
+            autoencoder=autoencoder, teacher_mean=teacher_mean,
+            teacher_std=teacher_std, q_st_start=q_st_start, q_st_end=q_st_end,
+            q_ae_start=q_ae_start, q_ae_end=q_ae_end)
+        map_combined = torch.nn.functional.pad(map_combined, (4, 4, 4, 4))
+        map_combined = torch.nn.functional.interpolate(
+            map_combined, (orig_height, orig_width), mode='bilinear')
+
+        map_combined = map_combined[0, 0].cpu().numpy() #.cpu()
+
+        defect_class = os.path.basename(os.path.dirname(path))
+        if test_output_dir is not None:
+            img_nm = os.path.split(path)[1].split('.')[0]
+            if not os.path.exists(os.path.join(test_output_dir, defect_class)):
+                os.makedirs(os.path.join(test_output_dir, defect_class))
+            file = os.path.join(test_output_dir, defect_class, img_nm + '.tiff')
+            tifffile.imwrite(file, map_combined)
+
+        y_true_image = 0 if defect_class == 'good' else 1
+        y_score_image = np.max(map_combined)
+        print('\n yscore ', y_score)
+        print('ytrue ', y_true)
+        y_true.append(y_true_image)
+        y_score.append(y_score_image)
+    auc = roc_auc_score(y_true=y_true, y_score=y_score)
+    return auc * 100
+
+
+def test_trial(test_set, unified, teacher_mean, teacher_std,
+         q_st_start, q_st_end, q_ae_start, q_ae_end, test_output_dir=None,
+         desc='Running inference'):
+    y_true = []
+    y_score = []
+    for image, target, path in tqdm(test_set, desc=desc):
+        orig_width = image.width
+        orig_height = image.height
+        image = default_transform(image)
+        image = image[None]
+        if on_gpu:
+            image = image.cuda()
+
+        #map_combined = unified(image)
+        map_combined = predictv2(
+            image=image, unified=unified, teacher_mean=teacher_mean,
+            teacher_std=teacher_std, q_st_start=q_st_start, q_st_end=q_st_end,
+            q_ae_start=q_ae_start, q_ae_end=q_ae_end)
+        map_combined = torch.nn.functional.pad(map_combined, (4, 4, 4, 4))
+        map_combined = torch.nn.functional.interpolate(
+            map_combined, (orig_height, orig_width), mode='bilinear')
+
+        map_combined = map_combined[0, 0].detach().cpu().numpy()
+
+        defect_class = os.path.basename(os.path.dirname(path))
+        if test_output_dir is not None:
+            img_nm = os.path.split(path)[1].split('.')[0]
+            if not os.path.exists(os.path.join(test_output_dir, defect_class)):
+                os.makedirs(os.path.join(test_output_dir, defect_class))
+            file = os.path.join(test_output_dir, defect_class, img_nm + '.tiff')
+            tifffile.imwrite(file, map_combined)
+
+        y_true_image = 0 if defect_class == 'good' else 1
+        y_score_image = np.max(map_combined)
+        #print("final max", y_score_image)
+        print('yscore ', y_score)
+        print('ytrue ', y_true , '\n')
+        y_true.append(y_true_image)
+        y_score.append(y_score_image)
+    #print("Shape of y_true:", np.shape(y_true))
+    #print("Shape of y_score:", np.shape(y_score))
+    auc = roc_auc_score(y_true=y_true, y_score=y_score)
+    return auc * 100
+
+
+
+@torch.no_grad()
+def predict(image, teacher, student, autoencoder, teacher_mean, teacher_std,
+            q_st_start=None, q_st_end=None, q_ae_start=None, q_ae_end=None):
+    teacher_output = teacher(image)
+    teacher_output = (teacher_output - teacher_mean) / teacher_std
+    student_output = student(image)
+    #print("Size of teacher output tensor:", teacher_output.size())
+    #print("Size of student output tensor:", student_output.size())
+    autoencoder_output = autoencoder(image)
+    #print("Size of auto output tensor:", autoencoder_output.size())
+
+    #print("Teacher output size:", teacher_output.size())
+    #print("Student output size:", student_output.size())
+    #print("Autoencoder output size:", autoencoder_output.size())
+    map_st = torch.mean((teacher_output - student_output[:, :out_channels])**2,
+                        dim=1, keepdim=True)
+    #print("Size of map_st tensor:", map_st.size())
+    map_ae = torch.mean((autoencoder_output -
+                         student_output[:, out_channels:])**2,
+                        dim=1, keepdim=True)
+    if q_st_start is not None:
+        map_st = 0.1 * (map_st - q_st_start) / (q_st_end - q_st_start)
+    if q_ae_start is not None:
+        map_ae = 0.1 * (map_ae - q_ae_start) / (q_ae_end - q_ae_start)
+    map_combined = 0.5 * map_st + 0.5 * map_ae
+    #print("Size of map_st tensor:", map_combined.size())
+    return map_combined, map_st, map_ae
+
+@torch.no_grad()
+def predictv2(image, unified, teacher_mean, teacher_std,
+            q_st_start=None, q_st_end=None, q_ae_start=None, q_ae_end=None):
+    from PIL import Image
+    image_np = image[0].cpu().numpy()
+    print("Size of the image tensor:", image[0].shape)
+    image_np = np.transpose(np.squeeze(image_np), (1, 2, 0))
+    print("Shape of image_np:", image_np.shape)
+    image_np = np.clip(image_np, 0, 1)
+    image_pil = Image.fromarray((image_np * 255).astype(np.uint8))
+    image_pil.save("image.jpg")
+    map_st, map_ae = unified(image)
+    #teacher_output = (teacher_output - teacher_mean) / teacher_std
+    #student_output = student(image)
+    #autoencoder_output = autoencoder(image)
+    #map_st = torch.mean((teacher_output - student_output[:, :out_channels])**2,
+    #                    dim=1, keepdim=True)
+    #map_ae = torch.mean((autoencoder_output -
+    #                     student_output[:, out_channels:])**2,
+    #                    dim=1, keepdim=True)
+    #print(shape(map_st))
+    print("Shape of map_st:", map_st.shape)
+    map_st = torch.mean(map_st,
+                        dim=1, keepdim=True)
+    
+    print("Shape of map_st post mean:", map_st.shape)
+    map_ae = torch.mean(map_ae,
+                        dim=1, keepdim=True)
+    print("Min of map_st:", torch.min(map_st).item(), "Max of map_st:", torch.max(map_st).item())
+    print("Min of map_ae:", torch.min(map_ae).item(), "Max of map_ae:", torch.max(map_ae).item())
+    if q_st_start is not None:
+        map_st = 0.1 * (map_st - q_st_start) / (q_st_end - q_st_start)
+    if q_ae_start is not None:
+        map_ae = 0.1 * (map_ae - q_ae_start) / (q_ae_end - q_ae_start)
+    print("[post] Min of map_st:", torch.min(map_st).item(), "Max of map_st:", torch.max(map_st).item())
+    print("[post] Min of map_ae:", torch.min(map_ae).item(), "Max of map_ae:", torch.max(map_ae).item())
+    map_combined = 0.5 * map_st + 0.5 * map_ae
+    print("[post] Min of map_ae:", torch.min(map_combined).item(), "Max of map_ae:", torch.max(map_combined).item())
+    return map_combined
+
+
+@torch.no_grad()
+def map_normalization(validation_loader, teacher, student, autoencoder,
+                      teacher_mean, teacher_std, desc='Map normalization'):
+    maps_st = []
+    maps_ae = []
+    # ignore augmented ae image
+    for image, _ in tqdm(validation_loader, desc=desc):
+        if on_gpu:
+            image = image.cuda()
+        map_combined, map_st, map_ae = predict(
+            image=image, teacher=teacher, student=student,
+            autoencoder=autoencoder, teacher_mean=teacher_mean,
+            teacher_std=teacher_std)
+        maps_st.append(map_st)
+        maps_ae.append(map_ae)
+    maps_st = torch.cat(maps_st)
+    maps_ae = torch.cat(maps_ae)
+    q_st_start = torch.quantile(maps_st, q=0.9)
+    q_st_end = torch.quantile(maps_st, q=0.995)
+    q_ae_start = torch.quantile(maps_ae, q=0.9)
+    q_ae_end = torch.quantile(maps_ae, q=0.995)
+    return q_st_start, q_st_end, q_ae_start, q_ae_end
+
+@torch.no_grad()
+def teacher_normalization(teacher, train_loader):
+
+    mean_outputs = []
+    for train_image, _ in tqdm(train_loader, desc='Computing mean of features'):
+        if on_gpu:
+            train_image = train_image.cuda()
+        #print("Train image shape:", train_image.shape)
+#        print("Expected input shape by the model:", teacher.input_shape)
+        teacher_output = teacher(train_image)
+        mean_output = torch.mean(teacher_output, dim=[0, 2, 3])
+        mean_outputs.append(mean_output)
+    channel_mean = torch.mean(torch.stack(mean_outputs), dim=0)
+    channel_mean = channel_mean[None, :, None, None]
+
+    mean_distances = []
+    for train_image, _ in tqdm(train_loader, desc='Computing std of features'):
+        if on_gpu:
+            train_image = train_image.cuda()
+        teacher_output = teacher(train_image)
+        distance = (teacher_output - channel_mean) ** 2
+        mean_distance = torch.mean(distance, dim=[0, 2, 3])
+        mean_distances.append(mean_distance)
+    channel_var = torch.mean(torch.stack(mean_distances), dim=0)
+    channel_var = channel_var[None, :, None, None]
+    channel_std = torch.sqrt(channel_var)
+
+    return channel_mean, channel_std
+
+
 
 '''
 import matplotlib.pyplot as plt
@@ -466,134 +846,7 @@ def test(test_set, unified_model, q_st_start, q_st_end, q_ae_start, q_ae_end, te
         y_score.append(y_score_image)
     auc = roc_auc_score(y_true=y_true, y_score=y_score)
     return auc * 100
-
-
-def test_onnx(test_set, unified_model, q_st_start, q_st_end, q_ae_start, q_ae_end, test_output_dir=None,
-         desc='Running inference'):
-    y_true = []
-    y_score = []
-    for image_path in tqdm(test_set, desc=desc):
-        image = Image.open(image_path).convert('RGB')
-        orig_width, orig_height = image.size
-        image = default_transform(image)
-        image = np.expand_dims(image, axis=0)  # Add batch dimension
-        if on_gpu:
-            image = image.cuda()
-        # Ensure the model is in evaluation mode
-        unified_model.eval()
-        with torch.no_grad():
-            map_combined = unified_model(torch.from_numpy(image).float())
-        map_combined = torch.nn.functional.pad(map_combined, (4, 4, 4, 4))
-        map_combined = torch.nn.functional.interpolate(
-            map_combined, (orig_height, orig_width), mode='bilinear')
-
-        map_combined = map_combined[0, 0].cpu().numpy()
-
-        defect_class = os.path.basename(os.path.dirname(image_path))
-        if test_output_dir is not None:
-            img_nm = os.path.splitext(os.path.basename(image_path))[0]
-            if not os.path.exists(os.path.join(test_output_dir, defect_class)):
-                os.makedirs(os.path.join(test_output_dir, defect_class))
-            file = os.path.join(test_output, defect_class, img_nm + '.tiff')
-            tifffile.imwrite(file, map_combined)
-
-        y_true_image = 0 if defect_class == 'good' else 1
-        y_score_image = np.max(map_combined)
-        y_true.append(y_true_image)
-        y_score.append(y_score_image)
-    auc = roc_auc_score(y_true=y_true, y_score=y_score)
-    return auc * 100
 '''
-@torch.no_grad()
-def predict(image, teacher, student, autoencoder, teacher_mean, teacher_std,
-            q_st_start=None, q_st_end=None, q_ae_start=None, q_ae_end=None):
-    teacher_output = teacher(image)
-    teacher_output = (teacher_output - teacher_mean) / teacher_std
-    student_output = student(image)
-    autoencoder_output = autoencoder(image)
-    map_st = torch.mean((teacher_output - student_output[:, :out_channels])**2,
-                        dim=1, keepdim=True)
-    map_ae = torch.mean((autoencoder_output -
-                         student_output[:, out_channels:])**2,
-                        dim=1, keepdim=True)
-    if q_st_start is not None:
-        map_st = 0.1 * (map_st - q_st_start) / (q_st_end - q_st_start)
-    if q_ae_start is not None:
-        map_ae = 0.1 * (map_ae - q_ae_start) / (q_ae_end - q_ae_start)
-    map_combined = 0.5 * map_st + 0.5 * map_ae
-    return map_combined, map_st, map_ae
-
-@torch.no_grad()
-def predictv2(image, teacher, student, autoencoder, teacher_mean, teacher_std,
-            q_st_start=None, q_st_end=None, q_ae_start=None, q_ae_end=None):
-    teacher_output = teacher(image)
-    teacher_output = (teacher_output - teacher_mean) / teacher_std
-    student_output = student(image)
-    autoencoder_output = autoencoder(image)
-    map_st = torch.mean((teacher_output - student_output[:, :out_channels])**2,
-                        dim=1, keepdim=True)
-    map_ae = torch.mean((autoencoder_output -
-                         student_output[:, out_channels:])**2,
-                        dim=1, keepdim=True)
-    if q_st_start is not None:
-        map_st = 0.1 * (map_st - q_st_start) / (q_st_end - q_st_start)
-    if q_ae_start is not None:
-        map_ae = 0.1 * (map_ae - q_ae_start) / (q_ae_end - q_ae_start)
-    map_combined = 0.5 * map_st + 0.5 * map_ae
-    return map_combined, map_st, map_ae
-
-
-@torch.no_grad()
-def map_normalization(validation_loader, teacher, student, autoencoder,
-                      teacher_mean, teacher_std, desc='Map normalization'):
-    maps_st = []
-    maps_ae = []
-    # ignore augmented ae image
-    for image, _ in tqdm(validation_loader, desc=desc):
-        #if on_gpu:
-        #    image = image.cuda()
-        map_combined, map_st, map_ae = predict(
-            image=image, teacher=teacher, student=student,
-            autoencoder=autoencoder, teacher_mean=teacher_mean,
-            teacher_std=teacher_std)
-        maps_st.append(map_st)
-        maps_ae.append(map_ae)
-    maps_st = torch.cat(maps_st)
-    maps_ae = torch.cat(maps_ae)
-    q_st_start = torch.quantile(maps_st, q=0.9)
-    q_st_end = torch.quantile(maps_st, q=0.995)
-    q_ae_start = torch.quantile(maps_ae, q=0.9)
-    q_ae_end = torch.quantile(maps_ae, q=0.995)
-    return q_st_start, q_st_end, q_ae_start, q_ae_end
-
-@torch.no_grad()
-def teacher_normalization(teacher, train_loader):
-
-    mean_outputs = []
-    for train_image, _ in tqdm(train_loader, desc='Computing mean of features'):
-        #if on_gpu:
-            #train_image = train_image.cuda()
-        #print("Train image shape:", train_image.shape)
-#        print("Expected input shape by the model:", teacher.input_shape)
-        teacher_output = teacher(train_image)
-        mean_output = torch.mean(teacher_output, dim=[0, 2, 3])
-        mean_outputs.append(mean_output)
-    channel_mean = torch.mean(torch.stack(mean_outputs), dim=0)
-    channel_mean = channel_mean[None, :, None, None]
-
-    mean_distances = []
-    for train_image, _ in tqdm(train_loader, desc='Computing std of features'):
-        #if on_gpu:
-        #    train_image = train_image.cuda()
-        teacher_output = teacher(train_image)
-        distance = (teacher_output - channel_mean) ** 2
-        mean_distance = torch.mean(distance, dim=[0, 2, 3])
-        mean_distances.append(mean_distance)
-    channel_var = torch.mean(torch.stack(mean_distances), dim=0)
-    channel_var = channel_var[None, :, None, None]
-    channel_std = torch.sqrt(channel_var)
-
-    return channel_mean, channel_std
 
 if __name__ == '__main__':
     main()

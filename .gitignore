@@ -8,3 +8,15 @@ __pycache__
 q_anom.onnx
 combined_model.pth
 combined_model.zip
+dataset
+datasets
+modelcheckpoints
+mvtech_ad_evaluation
+mvtec_anomaly_detection
+mvtec_loco_anomaly_detection
+new_env
+other
+output
+outputmodels
+saved_images
+

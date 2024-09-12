@@ -64,32 +64,6 @@ def get_autoencoder(out_channels=384):
                   stride=1, padding=1)
     )
 
-
-def get_autoencoder(out_channels=192):  # Adjusted for output size 58x58
-    return nn.Sequential(
-        # encoder
-        nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=2, padding=1),  # 128x128
-        nn.ReLU(inplace=True),
-        nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=2, padding=1),  # 64x64
-        nn.ReLU(inplace=True),
-        nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1),  # 32x32
-        nn.ReLU(inplace=True),
-        nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=2, padding=1),  # 16x16
-        nn.ReLU(inplace=True),
-        # decoder
-        nn.Upsample(scale_factor=2, mode='bilinear'),  # 32x32
-        nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, stride=1, padding=1),  # 32x32
-        nn.ReLU(inplace=True),
-        nn.Dropout(0.1),
-        nn.Upsample(scale_factor=2, mode='bilinear'),  # 64x64
-        nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1),  # 64x64
-        nn.ReLU(inplace=True),
-        nn.Dropout(0.1),
-        nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=0),  # 62x62
-        nn.ReLU(inplace=True),
-        nn.Conv2d(in_channels=32, out_channels=out_channels, kernel_size=5, stride=1, padding=0)  # 58x58
-    )
-
 def get_pdn_small(out_channels=384, padding=False):
     pad_mult = 1 if padding else 0
     return nn.Sequential(
@@ -105,41 +79,6 @@ def get_pdn_small(out_channels=384, padding=False):
                   padding=1 * pad_mult),
         nn.ReLU(inplace=True),
         nn.Conv2d(in_channels=256, out_channels=out_channels, kernel_size=4)
-    )
-
-def get_pdn_small(out_channels=192, padding=False):  # Reduced output channels
-    pad_mult = 1 if padding else 0
-    return nn.Sequential(
-        nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=2 * pad_mult),
-        nn.ReLU(inplace=True),
-        nn.AvgPool2d(kernel_size=2, stride=2, padding=1 * pad_mult),
-        nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=2 * pad_mult),
-        nn.ReLU(inplace=True),
-        nn.AvgPool2d(kernel_size=2, stride=2, padding=1 * pad_mult),
-        nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1 * pad_mult),
-        nn.ReLU(inplace=True),
-        nn.Conv2d(in_channels=128, out_channels=out_channels, kernel_size=3)
-    )
-
-
-def get_pdn_small(out_channels=192, padding=False):  # Adjusted channel sizes for slight performance increase
-    pad_mult = 1 if padding else 0
-    # Increase channels by about 10%
-    #first_layer_channels = int(64 * 1.2)  # Originally 64
-    #second_layer_channels = int(128 * 1.2)  # Originally 128
-    first_layer_channels = 96 # to use memory effectively
-    second_layer_channels = 160 # to use memory effectively
-    print(first_layer_channels, second_layer_channels)
-    return nn.Sequential(
-        nn.Conv2d(in_channels=3, out_channels=first_layer_channels, kernel_size=3, padding=2 * pad_mult),
-        nn.ReLU(inplace=True),
-        nn.AvgPool2d(kernel_size=2, stride=2, padding=1 * pad_mult),
-        nn.Conv2d(in_channels=first_layer_channels, out_channels=second_layer_channels, kernel_size=3, padding=2 * pad_mult),
-        nn.ReLU(inplace=True),
-        nn.AvgPool2d(kernel_size=2, stride=2, padding=1 * pad_mult),
-        nn.Conv2d(in_channels=second_layer_channels, out_channels=second_layer_channels, kernel_size=3, padding=1 * pad_mult),
-        nn.ReLU(inplace=True),
-        nn.Conv2d(in_channels=second_layer_channels, out_channels=out_channels, kernel_size=3)
     )
 
 def get_pdn_medium(out_channels=384, padding=False):

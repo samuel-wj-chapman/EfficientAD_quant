@@ -26,7 +26,7 @@ def get_argparse():
     parser.add_argument('-o', '--output_dir', default='output/1')
     parser.add_argument('-m', '--model_size', default='small',
                         choices=['small', 'medium'])
-    parser.add_argument('-w', '--weights', default='models/teacher_retrained.pth')
+    parser.add_argument('-w', '--weights', default='models/teacher_small.pth')
     parser.add_argument('-i', '--imagenet_train_path',
                         default='none',
                         help='Set to "none" to disable ImageNet' +
@@ -38,13 +38,13 @@ def get_argparse():
     parser.add_argument('-b', '--mvtec_loco_path',
                         default='./mvtec_loco_anomaly_detection',
                         help='Downloaded Mvtec LOCO dataset')
-    parser.add_argument('-t', '--train_steps', type=int, default=100000)
+    parser.add_argument('-t', '--train_steps', type=int, default=70000)
     return parser.parse_args()
 
 # constants
 seed = 42
 on_gpu = torch.cuda.is_available()
-out_channels = 192#384
+out_channels = 384
 image_size = 256
 
 # data loading
