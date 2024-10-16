@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  anom_service:
+    image: anom
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+        limits:
+          memory: 16g
+    volumes:
+      - /data/projects/swat/datasets_src/ImageNet:/dataset
+      - .:/app
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    user: "9895:200"
+    command: ["python3", "newteacher.py"]

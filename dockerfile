@@ -4,9 +4,10 @@ FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu20.04
 # Set the working directory
 WORKDIR /app
 ENV DEBIAN_FRONTEND=noninteractive 
+
 # Install Python and other dependencies
-RUN apt-get update --fix-missing
-RUN apt-get install -y \
+RUN apt-get update --fix-missing && \
+    apt-get install -y \
     python3.10 \
     python3-pip \
     libgl1-mesa-glx \
@@ -18,13 +19,17 @@ RUN apt-get install -y \
 # Upgrade pip to the latest version
 RUN python3 -m pip install --upgrade pip
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+# Install Python packages globally
+RUN pip install model-compression-toolkit pandas onnx torch torchvision
 
-# Install Python packages
-# Ensure you have a requirements.txt file or install directly
-RUN pip install /app
+# Create a group with GID 200
+RUN groupadd -g 200 appuser
 
-# Alternatively, if specific packages are needed, install them directly
-RUN pip install model-compression-toolkit onnx
+# Create a user with UID 9895 and associate it with GID 200
+RUN useradd -u 9895 -g 200 -m -s /bin/bash appuser
 
+# Change ownership of the /app directory to the non-root user
+RUN chown -R appuser:appuser /app
+
+# Switch to the non-root user
+USER appuser

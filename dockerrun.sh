@@ -1,0 +1,1 @@
+docker run -it --rm -v /data/projects/swat/datasets_src/ImageNet:/dataset -v /local_datasets:/dataset2 -v .:/app -m 16g --shm-size=20g --gpus all aom /bin/bash

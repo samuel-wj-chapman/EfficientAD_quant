@@ -18,5 +18,7 @@ new_env
 other
 output
 outputmodels
+processed_images
 saved_images
-
+runs
+sample_images
