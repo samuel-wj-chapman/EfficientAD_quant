@@ -73,13 +73,13 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
-from common import get_pdn_small
+from common import get_pdn_tiny
 
 
 class ExtendedPDNSmall(nn.Module):
     def __init__(self, num_classes=1000):
         super(ExtendedPDNSmall, self).__init__()
-        self.base_model = get_pdn_small(out_channels=192)  # Use the improved base model
+        self.base_model = get_pdn_tiny(out_channels=192)  # Use the improved base model
         self.gap = nn.AdaptiveAvgPool2d((1, 1))  # Global Average Pooling
         self.classifier = nn.Sequential(
             nn.Flatten(),

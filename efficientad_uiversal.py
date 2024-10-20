@@ -11,7 +11,7 @@ import os
 import random
 import shutil
 from tqdm import tqdm
-from common import get_autoencoder, get_pdn_small, get_pdn_medium, \
+from common import get_autoencoder, get_autoencoder_tiny, get_pdn_tiny, get_pdn_small, get_pdn_medium, \
     ImageFolderWithoutTarget, ImageFolderWithPath, InfiniteDataloader
 from sklearn.metrics import roc_auc_score
 
@@ -46,7 +46,8 @@ def get_argparse():
 # constants
 seed = 42
 on_gpu = torch.cuda.is_available()
-out_channels = 192#384
+
+
 image_size = 256
 
 # data loading
@@ -70,6 +71,11 @@ def main():
     random.seed(seed)
 
     config = get_argparse()
+    if config.exp == 'tiny':
+        out_channels = 192
+    else:
+        out_channels = 384
+
 
     if config.dataset == 'mvtec_ad':
         dataset_path = config.mvtec_ad_path
@@ -150,12 +156,23 @@ def main():
     elif config.model_size == 'medium':
         teacher = get_pdn_medium(out_channels)
         student = get_pdn_medium(2 * out_channels)
+    elif config.exp == 'tiny':
+        teacher = get_pdn_tiny(out_channels)
+        student = get_pdn_tiny(2 * out_channels)   
     else:
         raise Exception()
+    
+    if config.exp == 'tiny':
+        teacher = get_pdn_tiny(out_channels)
+        student = get_pdn_tiny(2 * out_channels)
+
     state_dict = torch.load(config.weights, map_location='cpu')
     teacher.load_state_dict(state_dict)
-    autoencoder = get_autoencoder(out_channels)
-
+    if config.exp == 'tiny' or config.model_size == 'tiny':
+        autoencoder = get_autoencoder_tiny(out_channels)
+    else:
+        autoencoder = get_autoencoder(out_channels)
+###### upto here
     # teacher frozen
     teacher.eval()
     student.train()

@@ -220,7 +220,7 @@ def get_pdn_small(out_channels=384, padding=False):
     )
 
 
-def get_pdn_small_tiny(out_channels=192, padding=False):  # Adjusted channel sizes for slight performance increase
+def get_pdn_tiny(out_channels=192, padding=False):  # Adjusted channel sizes for slight performance increase
     pad_mult = 1 if padding else 0
     # Increase channels by about 10%
     #first_layer_channels = int(64 * 1.2)  # Originally 64
@@ -243,7 +243,7 @@ def get_pdn_small_tiny(out_channels=192, padding=False):  # Adjusted channel siz
 
 import torch.nn as nn
 
-def get_pdn_small_tinyer(out_channels=192, padding=False):
+def get_pdn_tiny_improved(out_channels=192, padding=False):
     pad_mult = 1 if padding else 0
     first_layer_channels = 96  # To use memory effectively
     second_layer_channels = 160  # To use memory effectively
