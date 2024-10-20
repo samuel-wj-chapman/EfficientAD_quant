@@ -1,3 +1,22 @@
+# This code visualizes and compares anomaly detection results with original images
+
+# Description of what this code does:
+# 1. Loads anomaly maps (as TIFF files) from a specified directory
+# 2. Finds corresponding original images
+# 3. Processes the anomaly maps by scaling their values
+# 4. Creates a side-by-side comparison of the original image and the processed anomaly map
+# 5. Adds text labels to the images for clarity
+# 6. Saves the comparison images in an output directory
+# 7. Organizes the output by sub-dataset and anomaly type (good/bad)
+
+# The code walks through subdirectories, processes each image pair,
+# and creates a visual representation of the anomaly detection results.
+# This allows for easy visual inspection and comparison of the model's performance
+# across different types of anomalies and sub-datasets.
+
+
+
+
 import os
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
