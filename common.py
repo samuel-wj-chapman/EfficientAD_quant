@@ -146,33 +146,33 @@ class AutoencoderImproved(nn.Module):
 
     def forward(self, x):
         # Encoder
-        e1 = self.enc1(x)    # (N, 32, 128, 128)
-        e2 = self.enc2(e1)   # (N, 32, 64, 64)
-        e3 = self.enc3(e2)   # (N, 64, 32, 32)
-        e4 = self.enc4(e3)   # (N, 64, 16, 16)
-        e5 = self.enc5(e4)   # (N, 64, 8, 8)
-        b = self.bottleneck(e5)  # (N, 64, 4, 4)
+        e1 = self.enc1(x)    
+        e2 = self.enc2(e1)   
+        e3 = self.enc3(e2)  
+        e4 = self.enc4(e3)   
+        e5 = self.enc5(e4)   
+        b = self.bottleneck(e5)  
         
-        # Decoder with additive skip connections
-        d5 = self.up5(b)         # (N, 64, 4, 4) -> (N, 64, 8, 8)
-        d5 = self.dec5(d5 + e5)  # Add skip connection from e5
         
-        d4 = self.up4(d5)        # (N, 64, 8, 8) -> (N, 64, 16, 16)
-        d4 = self.dec4(d4 + e4)  # Add skip connection from e4
+        d5 = self.up5(b)         
+        d5 = self.dec5(d5 + e5)  
         
-        d3 = self.up3(d4)        # (N, 64, 16, 16) -> (N, 64, 32, 32)
-        d3 = self.dec3(d3 + e3)  # Add skip connection from e3
+        d4 = self.up4(d5)        
+        d4 = self.dec4(d4 + e4)  
         
-        d2 = self.up2(d3)        # (N, 64, 32, 32) -> (N, 32, 64, 64)
-        d2 = self.dec2(d2 + e2)  # Add skip connection from e2
+        d3 = self.up3(d4)        
+        d3 = self.dec3(d3 + e3)  
         
-        d1 = self.up1(d2)        # (N, 32, 64, 64) -> (N, 32, 128, 128)
-        d1 = self.dec1(d1 + e1)  # Add skip connection from e1
+        d2 = self.up2(d3)        
+        d2 = self.dec2(d2 + e2)  
         
-        d0 = self.up0(d1)        # (N, 32, 128, 128) -> (N, 64, 256, 256)
-        d0 = self.dec0(d0)       # Output: (N, out_channels, 256, 256)
+        d1 = self.up1(d2)       
+        d1 = self.dec1(d1 + e1) 
         
-        # Resize output to 56x56
+        d0 = self.up0(d1)        
+        d0 = self.dec0(d0)      
+        
+        
         out = self.output_resize(d0)
         return out
 
