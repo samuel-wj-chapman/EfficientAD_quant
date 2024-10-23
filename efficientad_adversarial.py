@@ -16,6 +16,9 @@ from common import get_pdn_small, get_pdn_medium, Autoencoder_improved , \
 from sklearn.metrics import roc_auc_score
 
 
+# this version of the model does not use the teacher, instead relies on the autoencoder to learn the features accurately
+# from the treacher. we use various methods to help this stage.
+
 def get_argparse():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--dataset', default='mvtec_ad',
